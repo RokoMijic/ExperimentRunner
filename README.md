@@ -1,2 +1,2 @@
 # ExperimentRunner
-Repository for running sets of experiments in parallel
+A repository for running sets of experiments in parallel
