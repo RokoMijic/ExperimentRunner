@@ -50,6 +50,32 @@ def experiment_fn(dataset, algorithm, hparams, metrics_dict):
 
 
 def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experiment_fn , n_jobs=16, rchoice_hparam = -1, rchoice_tot = -1, verbose=False):
+    
+        '''
+    Runs experiments in parallel using joblib
+    
+    PARAMETERS
+    
+    algo_dict     :  Dictionary of algorithms
+    dataset_dict  :  Dictionary of datasets
+    metrics_dict  :  Dictionary of metrics
+    hyperp_dict   :  Dictionary of hyperparams
+    experiment_fn :  Function that runs a single experiment, given a dataset, algorithm and dictionary of hyperparameter values. 
+                     The recommended syntax is something like this, though it will vary depending on how the metric is computed. 
+    
+                     def experiment_fn(dataset, algorithm, hparams, metrics_dict):
+                         result = algorithm(dataset=dataset, **hparams)
+                         return {n: m( result ) for n, m in metrics_dict.items() }  
+    
+    n_jobs: max number of processes to spawn, default 16
+    
+    rchoice_hparam: randomly choose up to this many hyperparameter sets. 
+                    Default is -1, which indicates using all sets of hyperparameters to make experiments
+                    
+    rchoice_tot:    randomly choose up to this many experiments to run. 
+                    Default is -1, which indicates running all experiments
+    
+    '''
 
     hyperp_settings_list = [   dict(  zip(  hyperp_dict.keys() ,  hparam_tuple  ) )  for    hparam_tuple  in  product(*hyperp_dict.values() )     ]
     
