@@ -10,7 +10,7 @@ import random
 import time
 
 
-def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experiment_fn , n_jobs=16, rchoice_hparam = -1, rchoice_tot = -1, verbose=True, is_sorted='asc'):
+def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experiment_fn , n_jobs=16, rchoice_hparam = -1, rchoice_tot = -1, verbose=True, is_sorted='asc', backend_name='loky'):
     
     '''
     Runs experiments in parallel using joblib
@@ -74,7 +74,7 @@ def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experime
     
     ################################################################################################
     # run all the experiments in parallel with joblib 
-    with parallel_backend('multiprocessing', n_jobs=n_jobs):
+    with parallel_backend(backend_name, n_jobs=n_jobs):
         results = Parallel()(delayed(experiment_fn)(**setting) for setting in experi_settings_list)
     ################################################################################################
     
