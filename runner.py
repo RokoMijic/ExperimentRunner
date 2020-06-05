@@ -1,16 +1,55 @@
+import joblib
 from joblib import Parallel, delayed
 from joblib import parallel_backend
+
+import contextlib
+from tqdm import tqdm
 
 from itertools import product
 from functools import cmp_to_key
 from more_itertools import unique_everseen
+
+import pandas as pd
 
 import random
 
 import time
 
 
-def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experiment_fn , n_jobs=16, rchoice_hparam = -1, rchoice_tot = -1, verbose=True, is_sorted='asc', backend_name='loky'):
+
+@contextlib.contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into tqdm progress bar given as argument"""
+    class TqdmBatchCompletionCallback:
+        def __init__(self, time, index, parallel):
+            self.index = index
+            self.parallel = parallel
+
+        def __call__(self, index):
+            tqdm_object.update()
+            if self.parallel._original_iterator is not None:
+                self.parallel.dispatch_next()
+
+    old_batch_callback = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.BatchCompletionCallBack = old_batch_callback
+        tqdm_object.close() 
+
+
+        
+def results_to_df(experirunner_res):
+    flattened_res_s = [ {  **{k:v for (k, v) in res['setting'].items() if k != 'hparams'} ,  **res['setting']['hparams'], **res['result'] }   for res in experirunner_res  ]
+    return pd.DataFrame(flattened_res_s)        
+     
+    
+def experiment_fn(dataset, algorithm, hparams, metrics_dict):
+    return algorithm(dataset=dataset, metrics_dict=metrics_dict, **hparams)
+
+        
+def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, n_jobs=16, rchoice_hparam = -1, rchoice_tot = -1, verbose=True, is_sorted='asc', backend_name='loky', ret_df=True):
     
     '''
     Runs experiments in parallel using joblib
@@ -60,7 +99,7 @@ def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experime
     
     if  0 < rchoice_tot < len(experi_names_list) :    experi_names_list = random.sample(experi_names_list, rchoice_tot)
     
-    if verbose: print(    f"Running {len(experi_names_list)} experiments"    )
+#     if verbose: print(    f"Running {len(experi_names_list)} experiments"    )
     
     # convert the names into actual objects for experiments
     experi_settings_list = [   { 'dataset'      :  dataset_dict[setting_n['dataset']]      ,   
@@ -72,11 +111,13 @@ def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experime
     
     start_t = time.time()
     
-    ################################################################################################
+    ##################################################################################################################
     # run all the experiments in parallel with joblib 
     with parallel_backend(backend_name, n_jobs=n_jobs):
-        results = Parallel()(delayed(experiment_fn)(**setting) for setting in experi_settings_list)
-    ################################################################################################
+        with tqdm_joblib(tqdm(desc=f"Running {len(experi_names_list)} experiments", total=len(experi_settings_list), position=0, leave=True  )) as progress_bar:
+            results = Parallel(n_jobs=n_jobs)(delayed(experiment_fn)(**setting) for setting in experi_settings_list)
+    ##################################################################################################################
+    
     
     end_t = time.time()
     if verbose: print("\n%.2f seconds elapsed \n" % (end_t - start_t) )
@@ -93,7 +134,10 @@ def run_experiments(algo_dict, dataset_dict, metrics_dict, hyperp_dict, experime
         results_w_settings_list = sorted(results_w_settings_list , key=cmp_to_key(compare_fn))
         
         
-    return results_w_settings_list
+    if ret_df:
+        return results_to_df(results_w_settings_list)
+    else:
+        return results_w_settings_list
 
 
 
